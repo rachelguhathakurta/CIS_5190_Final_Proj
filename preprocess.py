@@ -5,6 +5,10 @@ import pandas as pd
 from PIL import Image, ImageOps
 import os
 
+IMAGE_MEAN = [0.485, 0.456, 0.406]
+IMAGE_STD = [0.229, 0.224, 0.225]
+IMAGE_SIZE = (224, 224)
+
 PATH_COLS = ["image_path", "filepath", "image", "path", "file_name"]
 LAT_COLS = ["Latitude", "latitude", "lat"]
 LON_COLS = ["Longitude", "longitude", "lon"]
@@ -12,10 +16,9 @@ LON_COLS = ["Longitude", "longitude", "lon"]
 # preprocess data similar to how data is preprocessed in ResNet-18
 # reference: https://docs.pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html
 tf = transforms.Compose([
-    transforms.Resize(size=256),
-    transforms.CenterCrop(size=(224, 224)),
+    transforms.Resize(IMAGE_SIZE),
     transforms.ToTensor(),  # scaling to [0.0,1.0]
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transforms.Normalize(mean=IMAGE_MEAN, std=IMAGE_STD)
 ])
 
 def find_col_name(df: pd.DataFrame, candidates) -> str:

@@ -13,7 +13,7 @@ from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 
-from model import NormalizedRegressor
+from my_model import NormalizedRegressor
 from preprocess import prepare_data, compute_norm_stats
 
 

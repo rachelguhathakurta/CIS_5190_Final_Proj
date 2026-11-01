@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -85,26 +86,15 @@ class NormalizedRegressor(nn.Module):
             return self._denormalize(preds)
         return preds
 
-    
+
 class Model(nn.Module):
     """
-    Template model for the leaderboard.
-
-    Requirements:
-    - Must be instantiable with no arguments (called by the evaluator).
-    - Must implement `predict(batch)` which receives an iterable of inputs and
-      returns a list of predictions (labels).
-    - Must implement `eval()` to place the model in evaluation mode.
-    - If you use PyTorch, submit a state_dict to be loaded via `load_state_dict`
+    Submission-ready model that mirrors the template requirements.
     """
 
-    def __init__(
-        self,
-        device: str | torch.device | None = None,
-        weights_path: str | Path | None = None,
-    ) -> None:
-        super().__init__()
-        # Initialize your model here
+    def __init__(self, weights_path: str | Path | None = None, device: str | torch.device | None = None, *args,
+                 **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.device = self._resolve_device(device)
         self.transform = get_inference_transform()
         self.normalization = NormalizationStats(
@@ -113,7 +103,7 @@ class Model(nn.Module):
             lon_mean=-75.19157409667969,
             lon_std=0.00034724801662378013,
         )
-        self.model = ResNetGPSRegressor(pretrained=True).to(self.device)
+        self.model = ResNetGPSRegressor(pretrained=False).to(self.device)
         self._load_weights(weights_path)
         self.model.eval()
 
@@ -133,8 +123,18 @@ class Model(nn.Module):
             # Leave randomly initialized weights so that predict still runs.
             return
 
-        checkpoint = torch.load(path, map_location=self.device)
-        self.model.load_state_dict(checkpoint)
+        checkpoint = torch.load(path, map_location=self.device, weights_only=True)
+        state_dict = checkpoint.get("state_dict", checkpoint)
+        normalized = {}
+        for key, value in state_dict.items():
+            if key.startswith("module."):
+                key = key[len("module."):]
+            if key.startswith("model."):
+                key = key[len("model."):]
+            while key.startswith("backbone.backbone."):
+                key = key[len("backbone."):]
+            normalized[key] = value
+        self.model.load_state_dict(normalized, strict=True)
         self.normalization = NormalizationStats(
             lat_mean=39.951938629150390,
             lat_std=0.0006589124677702785,
@@ -142,10 +142,8 @@ class Model(nn.Module):
             lon_std=0.00034724801662378013,
             )
 
-
-    def eval(self) -> None:
-        # Optional: set your model to evaluation mode
-        self.model.eval()
+    def eval(self) -> Model:
+        return super().eval()
 
     def _prepare_tensor(self, sample: Any) -> torch.Tensor:
         if isinstance(sample, torch.Tensor):
@@ -170,15 +168,8 @@ class Model(nn.Module):
         scales = torch.tensor([stats.lat_std, stats.lon_std], device=preds.device)
         shifts = torch.tensor([stats.lat_mean, stats.lon_mean], device=preds.device)
         return preds * scales + shifts
-    
+
     def predict(self, batch: Iterable[Any]) -> List[Any]:
-        """
-        Implement your inference here.
-        Inputs:
-            batch: Iterable of preprocessed inputs (as produced by your preprocess.py)
-        Returns:
-            A list of predictions with the same length as `batch`.
-        """
         tensors = torch.stack([self._prepare_tensor(sample) for sample in batch])
         tensors = tensors.to(self.device)
 
@@ -190,11 +181,4 @@ class Model(nn.Module):
 
 
 def get_model() -> Model:
-    """
-    Factory function required by the evaluator.
-    Returns an uninitialized model instance. The evaluator may optionally load
-    weights (if provided) before calling predict(...).
-    """
     return Model()
-
-

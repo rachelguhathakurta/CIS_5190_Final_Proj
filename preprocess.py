@@ -4,6 +4,7 @@ from typing import Tuple
 import pandas as pd
 from PIL import Image, ImageOps
 import os
+from dataclasses import dataclass
 
 IMAGE_MEAN = [0.485, 0.456, 0.406]
 IMAGE_STD = [0.229, 0.224, 0.225]
@@ -56,3 +57,24 @@ def prepare_data(csv_path: str) -> Tuple[torch.Tensor, torch.Tensor]:
     X = torch.stack([load_image(os.path.join(base_dir, p)) for p in df[path_col]])   # get transformed image
     y = torch.tensor(df[[lat_col, lon_col]].values, dtype=torch.float32)
     return X, y
+
+
+@dataclass
+class NormStats:
+    lat_mean: float
+    lat_std: float
+    lon_mean: float
+    lon_std: float
+
+
+def compute_norm_stats(csv_path: str) -> NormStats:
+    """Mean/std of the targets, computed from the TRAINING split only."""
+    df = pd.read_csv(csv_path)
+    lat = df[find_col_name(df, LAT_COLS)]
+    lon = df[find_col_name(df, LON_COLS)]
+    return NormStats(
+        lat_mean=float(lat.mean()),
+        lat_std=float(lat.std()),
+        lon_mean=float(lon.mean()),
+        lon_std=float(lon.std()),
+    )
